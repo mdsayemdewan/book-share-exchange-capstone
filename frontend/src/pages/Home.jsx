@@ -78,7 +78,7 @@ export default function Home() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-violet-600">📚</div>
                   <div>
                     <div className="font-semibold text-sm text-gray-900">Atomic Habits</div>
-                    <div className="text-xs text-gray-500">Shared by Sarah in Dhaka</div>
+                    <div className="text-xs text-gray-500">Shared by Sayem in Dhaka</div>
                   </div>
                 </div>
               </div>
@@ -97,7 +97,7 @@ export default function Home() {
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">🤝</div>
                   <div>
-                    <div className="font-semibold text-sm text-gray-900">Looking for 1984</div>
+                    <div className="font-semibold text-sm text-gray-900">Looking for Book</div>
                     <div className="text-xs text-gray-500">Will trade for The Hobbit</div>
                   </div>
                 </div>
