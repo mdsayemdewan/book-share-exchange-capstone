@@ -45,10 +45,8 @@ export default function Navbar() {
       );
       setUnread((u) => Math.max(0, u - 1));
     }
-    if (n.data?.shareBookId || n.data?.borrowRequestId) {
+    if (n.data?.shareBookId || n.data?.borrowRequestId || n.data?.requestId) {
       nav('/dashboard');
-    } else if (n.data?.requestId) {
-      nav('/exchange');
     }
     setOpen(false);
   };
@@ -60,12 +58,6 @@ export default function Navbar() {
           Book Distribution
         </Link>
         <div className="flex items-center gap-3 text-sm">
-          <button
-            onClick={() => nav('/rating')}
-            className="hidden md:inline-block text-gray-700 hover:text-gray-900 font-medium"
-          >
-            Rating
-          </button>
           {auth?.token ? (
             <>
               <button
@@ -73,18 +65,6 @@ export default function Navbar() {
                 className="hidden md:inline-block text-gray-700 hover:text-gray-900"
               >
                 Dashboard
-              </button>
-              <button
-                onClick={() => nav('/share')}
-                className="hidden md:inline-block text-gray-700 hover:text-gray-900"
-              >
-                Share Books
-              </button>
-              <button
-                onClick={() => nav('/exchange')}
-                className="hidden md:inline-block text-gray-700 hover:text-gray-900"
-              >
-                Exchange
               </button>
               <div className="relative">
                 <button
