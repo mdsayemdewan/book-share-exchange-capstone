@@ -1,3 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased scroll-smooth;
+  }
+  body {
+    @apply text-gray-900 font-sans selection:bg-indigo-500/30 selection:text-indigo-900;
+    background-color: #f0f4ff;
+    background-image:
+      radial-gradient(ellipse 80% 60% at 20% 0%, rgba(139, 92, 246, 0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 10%, rgba(99, 102, 241, 0.14) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 60% at 60% 90%, rgba(167, 139, 250, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 10% 80%, rgba(196, 181, 253, 0.14) 0%, transparent 50%);
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-lg border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+  }
+  .glass-nav {
+    @apply backdrop-blur-md border-b border-white/30 shadow-sm supports-[backdrop-filter]:bg-white/60;
+    background: rgba(255, 255, 255, 0.72);
+  }
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600;
+  }
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  .page-card {
+    @apply bg-white/80 backdrop-blur-xl rounded-3xl shadow-[0_8px_32px_rgba(109,40,217,0.08)] border border-white/50;
+  }
+  .section-bg {
+    @apply bg-white/50 backdrop-blur-sm rounded-3xl border border-white/60;
+  }
+}
+
+@keyframes float {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+/* Subtle animated orbs in the background */
+body::before {
+  content: '';
+  position: fixed;
+  top: -20%;
+  right: -10%;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+  animation: orbFloat 12s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  bottom: -20%;
+  left: -10%;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.10) 0%, transparent 70%);
+  animation: orbFloat 15s ease-in-out infinite reverse;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes orbFloat {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(30px, -30px) scale(1.05); }
+  66%  { transform: translate(-20px, 20px) scale(0.97); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+/* Ensure all content sits above the background orbs */
+#root {
+  position: relative;
+  z-index: 1;
+}
