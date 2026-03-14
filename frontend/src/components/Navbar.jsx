@@ -55,7 +55,7 @@ export default function Navbar() {
     <div className="w-full border-b bg-white">
       <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between gap-4">
         <Link to="/" className="font-semibold text-gray-900">
-          Bookish World
+          Bookish
         </Link>
         <div className="flex items-center gap-3 text-sm">
           {auth?.token ? (
