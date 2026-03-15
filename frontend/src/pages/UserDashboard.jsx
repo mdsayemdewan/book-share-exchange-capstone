@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { api } from '../lib/api';
 
-const CONDITION_COLORS = { new: 'bg-emerald-100 text-emerald-800', good: 'bg-sky-100 text-sky-800', used: 'bg-amber-100 text-amber-800' };
-const CATEGORIES = ['Fiction', 'Non-fiction', 'Academic', 'Science', 'History', 'Self-help', 'Children', 'Other'];
+const CONDITION_COLORS = { new: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30', good: 'bg-sky-500/20 text-sky-300 border-sky-400/30', used: 'bg-amber-500/20 text-amber-300 border-amber-400/30' };
+const CATEGORIES = ['Fiction', 'Non-fiction', 'Academic', 'Science', 'History', 'Self-help', 'Children', 'Thriller', 'Horror', 'Comics', 'Fantasy', 'Other'];
 const DURATION_OPTIONS = [7, 14, 21, 30, 60];
 
 function fileToDataUrl(file) {
@@ -26,7 +27,8 @@ function fmtDate(d) {
 }
 
 export default function UserDashboard() {
-  const [section, setSection] = useState('share');
+  const loc = useLocation();
+  const [section, setSection] = useState(loc.state?.section || 'share');
 
   // ── Share state ──────────────────────────────────────────────────
   const [myShareBooks, setMyShareBooks] = useState([]);
@@ -66,7 +68,7 @@ export default function UserDashboard() {
   const [myExchanges, setMyExchanges] = useState([]);
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [offerRequests, setOfferRequests] = useState([]);
-  const [exTab, setExTab] = useState('create');
+  const [exTab, setExTab] = useState(loc.state?.exTab || 'create');
 
   // Create exchange offer form
   const [bookName, setBookName] = useState('');
@@ -79,6 +81,13 @@ export default function UserDashboard() {
   const [files, setFiles] = useState([]);
   const [creating, setCreating] = useState(false);
 
+  useEffect(() => {
+    if (loc.state?.section) setSection(loc.state.section);
+    if (loc.state?.exTab) setExTab(loc.state.exTab);
+    // Replace state so it doesn't persistently stay after unmounting and remounting without arguments
+    window.history.replaceState({}, document.title);
+  }, [loc.state]);
+
   // Edit exchange offer
   const [editingOffer, setEditingOffer] = useState(null);
   const [editBookName, setEditBookName] = useState('');
@@ -87,6 +96,9 @@ export default function UserDashboard() {
   const [editLocation, setEditLocation] = useState('');
   const [editWantedBook, setEditWantedBook] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+
+  const [rejectingExReq, setRejectingExReq] = useState(null);
+  const [rejectExReason, setRejectExReason] = useState('');
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -240,9 +252,17 @@ export default function UserDashboard() {
     try { await api(`/api/exchange/requests/${req._id}/accept`, { method: 'POST', body: {} }); await load(); if (selectedOffer) await loadOfferRequests(selectedOffer); }
     catch (err) { setError(err?.message || 'Failed'); }
   };
-  const rejectIncoming = async (req) => {
-    setError('');
-    try { await api(`/api/exchange/requests/${req._id}/reject`, { method: 'POST' }); await load(); if (selectedOffer) await loadOfferRequests(selectedOffer); }
+  const submitRejectEx = async (e) => {
+    e.preventDefault(); setError('');
+    if (!rejectingExReq) return;
+    try { 
+      await api(`/api/exchange/requests/${rejectingExReq._id}/reject`, { 
+        method: 'POST', 
+        body: rejectExReason ? { message: rejectExReason } : {} 
+      }); 
+      setRejectingExReq(null); setRejectExReason(''); await load(); 
+      if (selectedOffer) await loadOfferRequests(selectedOffer); 
+    }
     catch (err) { setError(err?.message || 'Failed'); }
   };
 
@@ -277,156 +297,168 @@ export default function UserDashboard() {
   // ── Status badge helper ──────────────────────────────────────────
   const statusBadge = (st) => {
     const map = {
-      pending: 'bg-amber-50 text-amber-700 border-amber-200',
-      approved: 'bg-sky-50 text-sky-700 border-sky-200',
-      rejected: 'bg-red-50 text-red-700 border-red-200',
-      returned: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      overdue: 'bg-red-100 text-red-800 border-red-300',
-      available: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      borrowed: 'bg-sky-50 text-sky-700 border-sky-200',
+      pending: 'bg-amber-500/20 text-amber-300 border-amber-400/30',
+      approved: 'bg-primary-500/20 text-primary-300 border-primary-400/30',
+      rejected: 'bg-red-500/20 text-red-300 border-red-400/30',
+      returned: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30',
+      overdue: 'bg-red-500/30 text-red-200 border-red-400 font-bold',
+      available: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30',
+      borrowed: 'bg-primary-500/20 text-primary-300 border-primary-400/30',
     };
-    return `inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${map[st] || 'bg-gray-100 text-gray-700 border-gray-200'}`;
+    return `inline-flex items-center rounded-lg border px-2.5 py-1 text-[10px] uppercase tracking-wider font-bold shadow-sm ${map[st] || 'bg-white/10 text-gray-300 border-white/20'}`;
   };
 
+  const inputClass = "w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:bg-white/15 transition-all";
+  const selectClass = "w-full rounded-2xl border border-white/20 bg-slate-800 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all";
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-900 text-slate-200 pb-12">
       {(sCreating || creating) && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center p-6 rounded-2xl bg-white shadow-2xl border">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-900 border-t-transparent mb-4"></div>
-            <h3 className="font-semibold text-gray-900">Uploading Book Details...</h3>
-            <p className="text-sm text-gray-500 mt-1">Please wait while we upload images to ImgBB and save.</p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+          <div className="flex flex-col items-center p-8 rounded-3xl bg-slate-800 border border-white/10 shadow-2xl">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent mb-4"></div>
+            <h3 className="font-bold text-white text-lg">Uploading...</h3>
+            <p className="text-sm text-slate-400 mt-1">Saving your book details.</p>
           </div>
         </div>
       )}
-      {/* Header */}
-      <div className="bg-gradient-to-br from-violet-50 via-white to-sky-50 border-b">
-        <div className="mx-auto max-w-5xl px-4 pt-8 pb-0">
-          <div className="flex items-end justify-between gap-4 mb-6">
+
+      {/* ── Header ── */}
+      <div className="relative border-b border-white/10 overflow-hidden bg-slate-800/50 backdrop-blur-lg">
+        <div className="absolute top-0 right-0 -translate-y-12 translate-x-1/3 w-96 h-96 bg-primary-500/20 rounded-full blur-3xl mix-blend-screen opacity-60"></div>
+        <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/3 w-96 h-96 bg-violet-500/20 rounded-full blur-3xl mix-blend-screen opacity-60"></div>
+
+        <div className="relative z-10 mx-auto max-w-5xl px-4 pt-12 pb-0">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">My Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-600">Manage your shared books, exchange offers, and borrows.</p>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-500/20 border border-primary-400/30 text-primary-300 text-xs font-bold uppercase tracking-widest mb-3">
+                Overview
+              </div>
+              <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight">My Dashboard</h1>
+              <p className="mt-2 text-sm text-slate-400 font-medium">Manage your shared books, offers, and borrows.</p>
             </div>
-            <button onClick={load} className="rounded-full border bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 shadow-sm">Refresh</button>
+            <button onClick={load} className="self-start md:self-auto flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/20 shadow-lg transition-all active:scale-95">
+              <span>↻</span> Refresh
+            </button>
           </div>
-          <div className="flex gap-1 border-b -mb-px">
+
+          <div className="flex gap-6 border-b border-white/10 overflow-x-auto no-scrollbar">
             {SECTIONS.map((s) => (
               <button key={s.id} onClick={() => setSection(s.id)}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${section === s.id ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                className={`flex items-center gap-2 py-3.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${section === s.id ? 'border-primary-400 text-primary-400' : 'border-transparent text-slate-400 hover:text-white hover:border-white/30'}`}>
                 {s.label}
-                {s.count > 0 && <span className="ml-1.5 inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-700">{s.count}</span>}
+                {s.count > 0 && <span className={`inline-flex items-center justify-center rounded-lg px-2 py-0.5 text-[10px] font-extrabold ${section === s.id ? 'bg-primary-500/20 text-primary-300' : 'bg-white/10 text-slate-300'}`}>{s.count}</span>}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-4 py-6">
-        {error && <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        {error && <div className="mb-6 rounded-2xl bg-red-500/20 border border-red-400/30 p-4 text-sm font-medium text-red-200">{error}</div>}
 
         {/* ══════════════════════════════════════ SHARE TAB ══════════════════════════════════════ */}
         {section === 'share' && (
-          <div className="space-y-6">
-            <div className="flex gap-1.5 flex-wrap">
+          <div className="space-y-8">
+            <div className="flex gap-2 flex-wrap bg-white/5 p-1.5 rounded-2xl w-fit border border-white/10">
               {[
-                { id: 'create', label: 'Share a book' },
-                { id: 'listings', label: `My listings (${myShareBooks.length})` },
-                { id: 'borrows', label: `My borrows (${myBorrows.length})` },
+                { id: 'create', label: 'Share a Book' },
+                { id: 'listings', label: `My Listings (${myShareBooks.length})` },
+                { id: 'borrows', label: `My Borrows (${myBorrows.length})` },
                 { id: 'active', label: `Active (${activeBorrows.length})` },
               ].map((t) => (
                 <button key={t.id} onClick={() => setShareTab(t.id)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-medium border transition ${shareTab === t.id ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  className={`rounded-xl px-5 py-2 text-sm font-bold transition-all ${shareTab === t.id ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
                 >{t.label}</button>
               ))}
             </div>
 
-            {/* ── Create share listing ── */}
+            {/* Create Share */}
             {shareTab === 'create' && (
-              <div className="max-w-lg rounded-2xl border bg-white p-6 shadow-sm">
-                <h3 className="font-semibold text-gray-900">Share a book for borrowing</h3>
-                <p className="text-xs text-gray-500 mt-1">List a book you'd like to lend to others.</p>
-                <form onSubmit={createShareBook} className="mt-5 grid gap-3">
-                  <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Book title</span>
-                    <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" value={sBookName} onChange={(e) => setSBookName(e.target.value)} required /></label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Condition</span>
-                      <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={sCondition} onChange={(e) => setSCondition(e.target.value)}>
+              <div className="max-w-lg rounded-3xl border border-white/10 bg-white/5 p-7 shadow-xl backdrop-blur-sm">
+                <h3 className="font-bold text-white text-xl">Share a book for borrowing</h3>
+                <p className="text-sm text-slate-400 mt-1 mb-5">List a book you'd like to lend to the community.</p>
+                <form onSubmit={createShareBook} className="grid gap-4">
+                  <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Book title</span>
+                    <input className={inputClass} value={sBookName} onChange={(e) => setSBookName(e.target.value)} required /></label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Condition</span>
+                      <select className={selectClass} value={sCondition} onChange={(e) => setSCondition(e.target.value)}>
                         <option value="new">New</option><option value="good">Good</option><option value="used">Used</option>
                       </select></label>
-                    <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Category</span>
-                      <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={sCategory} onChange={(e) => setSCategory(e.target.value)} required>
+                    <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Category</span>
+                      <select className={selectClass} value={sCategory} onChange={(e) => setSCategory(e.target.value)} required>
                         <option value="">Select category</option>
                         {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select></label>
                   </div>
-                  <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Location</span>
-                    <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" placeholder="e.g. Dhanmondi, Dhaka" value={sLocation} onChange={(e) => setSLocation(e.target.value)} required /></label>
-                  <div className="grid grid-cols-5 gap-2 items-end">
-                    <label className="col-span-2 grid gap-1"><span className="text-xs font-medium text-gray-600">Lat</span><input className="rounded-lg border bg-gray-50 px-2 py-1.5 text-xs" value={sLat} onChange={(e) => setSLat(e.target.value)} placeholder="auto" /></label>
-                    <label className="col-span-2 grid gap-1"><span className="text-xs font-medium text-gray-600">Lng</span><input className="rounded-lg border bg-gray-50 px-2 py-1.5 text-xs" value={sLng} onChange={(e) => setSLng(e.target.value)} placeholder="auto" /></label>
-                    <button type="button" onClick={useGeo(setSLat, setSLng)} className="rounded-lg border px-2 py-1.5 text-[10px] hover:bg-gray-50">Detect</button>
+                  <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Location</span>
+                    <input className={inputClass} placeholder="e.g. Dhanmondi, Dhaka" value={sLocation} onChange={(e) => setSLocation(e.target.value)} required /></label>
+                  <div className="grid grid-cols-5 gap-3 items-end">
+                    <label className="col-span-2 grid gap-1.5"><span className="text-xs font-semibold text-slate-400">Latitude</span><input className={inputClass} style={{ padding: '0.4rem 0.8rem', fontSize: '12px' }} value={sLat} onChange={(e) => setSLat(e.target.value)} placeholder="auto" /></label>
+                    <label className="col-span-2 grid gap-1.5"><span className="text-xs font-semibold text-slate-400">Longitude</span><input className={inputClass} style={{ padding: '0.4rem 0.8rem', fontSize: '12px' }} value={sLng} onChange={(e) => setSLng(e.target.value)} placeholder="auto" /></label>
+                    <button type="button" onClick={useGeo(setSLat, setSLng)} className="rounded-xl border border-primary-500/30 bg-primary-500/10 h-[34px] text-[11px] font-bold text-primary-300 hover:bg-primary-500/20 transition-colors">Detect</button>
                   </div>
-                  <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Borrow duration</span>
-                    <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={sDuration} onChange={(e) => setSDuration(Number(e.target.value))}>
+                  <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Borrow duration</span>
+                    <select className={selectClass} value={sDuration} onChange={(e) => setSDuration(Number(e.target.value))}>
                       {DURATION_OPTIONS.map((d) => <option key={d} value={d}>{d} days</option>)}
                     </select></label>
-                  <div className="grid gap-1">
-                    <span className="text-sm font-medium text-gray-700">Book images</span>
+                  <div className="grid gap-1.5">
+                    <span className="text-sm font-semibold text-slate-300">Book images</span>
                     <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); pickFiles(setSFiles)(e.dataTransfer.files); }}
-                      className="rounded-xl border-2 border-dashed bg-gray-50 p-4 text-center text-xs text-gray-500">
-                      <div>Drop images here or <label className="cursor-pointer font-medium text-gray-900 underline">browse<input type="file" className="hidden" multiple accept="image/*" onChange={(e) => pickFiles(setSFiles)(e.target.files)} /></label></div>
-                      <div className="text-[10px] text-gray-400 mt-1">Max 6 images</div>
+                      className="rounded-2xl border-2 border-dashed border-white/20 bg-white/5 p-6 text-center text-sm text-slate-400 hover:bg-white/10 transition-colors">
+                      <div>Drop images here or <label className="cursor-pointer font-bold text-primary-400 hover:text-primary-300">browse<input type="file" className="hidden" multiple accept="image/*" onChange={(e) => pickFiles(setSFiles)(e.target.files)} /></label></div>
                     </div>
                     {sPreviews.length > 0 && <div className="mt-2 grid grid-cols-4 gap-2">{sPreviews.map((p) => (
-                      <div key={p.name} className="relative rounded-lg border overflow-hidden"><img src={p.url} alt="" className="h-16 w-full object-cover" />
-                        <button type="button" onClick={() => setSFiles((prev) => prev.filter((f) => f.name !== p.name))} className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-[10px] opacity-0 hover:opacity-100 transition">&times;</button></div>
+                      <div key={p.name} className="relative rounded-xl border border-white/20 overflow-hidden"><img src={p.url} alt="" className="h-20 w-full object-cover" />
+                        <button type="button" onClick={() => setSFiles((prev) => prev.filter((f) => f.name !== p.name))} className="absolute inset-0 flex items-center justify-center bg-black/60 text-white font-bold opacity-0 hover:opacity-100 transition">&times;</button></div>
                     ))}</div>}
                   </div>
-                  <button disabled={sCreating} className="rounded-xl bg-gray-900 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60">{sCreating ? 'Uploading…' : 'Share book'}</button>
+                  <button disabled={sCreating} className="mt-2 rounded-2xl bg-gradient-to-r from-primary-500 to-indigo-500 py-3 text-sm font-bold text-white shadow-lg hover:shadow-primary-500/30 disabled:opacity-60 transition-all active:scale-95">{sCreating ? 'Uploading…' : 'Publish Book'}</button>
                 </form>
               </div>
             )}
 
-            {/* ── My listings ── */}
+            {/* My Listings */}
             {shareTab === 'listings' && (
-              <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b"><h3 className="font-semibold text-gray-900">Your shared book listings</h3></div>
-                {myShareBooks.length === 0 ? <div className="p-8 text-center text-sm text-gray-500">No listings yet.</div> : (
-                  <div className="divide-y">{myShareBooks.map((b) => (
-                    <div key={b._id} className="p-4 space-y-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${CONDITION_COLORS[b.condition]}`}>{b.condition}</span>
-                          <span className="font-medium text-gray-900">{b.bookName}</span>
-                          <span className="text-xs text-gray-500">{b.category}</span>
+              <div className="rounded-3xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/10 bg-white/5"><h3 className="font-bold text-white">Your shared book listings</h3></div>
+                {myShareBooks.length === 0 ? <div className="p-10 text-center text-slate-400">No listings yet.</div> : (
+                  <div className="divide-y divide-white/10">{myShareBooks.map((b) => (
+                    <div key={b._id} className="p-5 space-y-3 hover:bg-white/5 transition-colors">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className={`shrink-0 border rounded-full px-2.5 py-0.5 text-[10px] font-bold ${CONDITION_COLORS[b.condition]}`}>{b.condition}</span>
+                          <span className="font-bold text-white text-base">{b.bookName}</span>
+                          <span className="px-2 py-0.5 rounded-md bg-white/10 text-xs text-slate-300 font-medium">{b.category}</span>
                           <span className={statusBadge(b.status)}>{b.status}</span>
-                          <span className="text-xs text-gray-400">{b.borrowDuration}d</span>
+                          <span className="text-xs font-semibold text-slate-500">⏱ {b.borrowDuration} days</span>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
                           {b.status === 'available' && (
                             <>
-                              <button type="button" onClick={() => startEditShare(b)} className="rounded-full border px-2.5 py-1 text-[10px] text-gray-600 hover:bg-gray-50">Edit</button>
-                              <button type="button" onClick={() => deleteShareBook(b)} className="rounded-full border border-red-200 px-2.5 py-1 text-[10px] text-red-600 hover:bg-red-50">Delete</button>
+                              <button type="button" onClick={() => startEditShare(b)} className="rounded-xl border border-white/20 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors">Edit</button>
+                              <button type="button" onClick={() => deleteShareBook(b)} className="rounded-xl border border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition-colors">Delete</button>
                             </>
                           )}
-                          <button type="button" onClick={() => selectedShareBook?._id === b._id ? setSelectedShareBook(null) : loadShareRequests(b)} className="rounded-full border px-3 py-1 text-xs hover:bg-gray-50">
-                            {selectedShareBook?._id === b._id ? 'Hide' : 'Requests'}
+                          <button type="button" onClick={() => selectedShareBook?._id === b._id ? setSelectedShareBook(null) : loadShareRequests(b)} className="rounded-xl border border-primary-500/30 bg-primary-500/10 px-4 py-1.5 text-xs font-bold text-primary-300 hover:bg-primary-500/20 transition-colors">
+                            {selectedShareBook?._id === b._id ? 'Hide Requests' : 'View Requests'}
                           </button>
                         </div>
                       </div>
                       {selectedShareBook?._id === b._id && (
-                        <div className="ml-4 rounded-xl border bg-gray-50 overflow-hidden">
-                          {shareBookRequests.length === 0 ? <div className="p-3 text-xs text-gray-500">No requests yet.</div> : (
-                            <div className="divide-y">{shareBookRequests.map((r) => (
-                              <div key={r._id} className="p-3 text-xs space-y-1">
-                                <div><span className="font-medium text-gray-900">{r.borrower?.name || 'User'}</span> wants to borrow</div>
-                                {r.message && <div className="text-gray-600">"{r.message}"</div>}
-                                <div className="flex items-center justify-between gap-2 pt-1">
+                        <div className="ml-5 rounded-2xl border border-white/10 bg-slate-800/80 overflow-hidden shadow-inner mt-3">
+                          {shareBookRequests.length === 0 ? <div className="p-4 text-sm text-slate-400">No requests yet.</div> : (
+                            <div className="divide-y divide-white/5">{shareBookRequests.map((r) => (
+                              <div key={r._id} className="p-4 text-sm space-y-2">
+                                <div><span className="font-bold text-white">{r.borrower?.name || 'A user'}</span> wants to borrow</div>
+                                {r.message && <div className="text-slate-300 italic border-l-2 border-primary-500/50 pl-2 py-0.5 mt-1 text-xs">"{r.message}"</div>}
+                                <div className="flex items-center justify-between gap-3 pt-2">
                                   <span className={statusBadge(r.status)}>{r.status}</span>
                                   {r.status === 'pending' && (
-                                    <div className="flex gap-1.5">
-                                      <button type="button" onClick={() => approveRequest(r)} className="rounded-full bg-gray-900 px-2.5 py-0.5 text-[10px] text-white hover:bg-gray-800">Approve</button>
-                                      <button type="button" onClick={() => rejectShareReq(r)} className="rounded-full border px-2.5 py-0.5 text-[10px] hover:bg-gray-50">Reject</button>
+                                    <div className="flex gap-2">
+                                      <button type="button" onClick={() => approveRequest(r)} className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-1.5 text-xs font-bold text-white hover:opacity-90 transition-opacity flex items-center gap-1"><span className="text-sm">✓</span> Approve</button>
+                                      <button type="button" onClick={() => rejectShareReq(r)} className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-1.5 text-xs font-bold text-red-300 hover:bg-red-500/20 transition-colors">Reject</button>
                                     </div>
                                   )}
                                 </div>
@@ -441,19 +473,23 @@ export default function UserDashboard() {
               </div>
             )}
 
-            {/* ── My borrows (as borrower) ── */}
+            {/* My Borrows */}
             {shareTab === 'borrows' && (
-              <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b"><h3 className="font-semibold text-gray-900">Borrow requests you sent</h3></div>
-                {myBorrows.length === 0 ? <div className="p-8 text-center text-sm text-gray-500">No borrow requests yet.</div> : (
-                  <div className="divide-y">{myBorrows.map((r) => (
-                    <div key={r._id} className="p-4 flex items-center justify-between gap-3 hover:bg-gray-50/50 transition">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{r.shareBook?.bookName}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{r.shareBook?.category} · {r.shareBook?.condition} · {r.shareBook?.borrowDuration}d</div>
-                        {r.message && <div className="text-xs text-gray-500 mt-0.5">"{r.message}"</div>}
-                        {r.dueDate && <div className="text-xs mt-0.5"><span className="font-medium text-gray-700">Due:</span> {fmtDate(r.dueDate)}</div>}
-                        {r.owner && r.status === 'approved' && <div className="text-xs text-gray-500 mt-0.5">Owner: {r.owner.name} · {r.owner.phone}</div>}
+              <div className="rounded-3xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/10 bg-white/5"><h3 className="font-bold text-white">Borrow requests you sent</h3></div>
+                {myBorrows.length === 0 ? <div className="p-10 text-center text-slate-400">No borrow requests sent yet.</div> : (
+                  <div className="divide-y divide-white/10">{myBorrows.map((r) => (
+                    <div key={r._id} className="p-5 flex items-center justify-between gap-4 hover:bg-white/5 transition-colors">
+                      <div className="space-y-1">
+                        <div className="text-base font-bold text-white">{r.shareBook?.bookName}</div>
+                        <div className="flex gap-2 items-center text-xs text-slate-400 font-medium">
+                          <span className="bg-white/10 px-2 py-0.5 rounded text-slate-300">{r.shareBook?.category}</span>
+                          <span className="bg-white/10 px-2 py-0.5 rounded text-slate-300">{r.shareBook?.condition}</span>
+                          <span>⏱ {r.shareBook?.borrowDuration} days</span>
+                        </div>
+                        {r.message && <div className="text-xs text-slate-400 italic">" {r.message} "</div>}
+                        {r.dueDate && <div className="text-xs mt-1 text-primary-300 font-semibold">Due: {fmtDate(r.dueDate)}</div>}
+                        {r.owner && r.status === 'approved' && <div className="text-xs text-emerald-300 font-medium mt-1">Owner: {r.owner.name} · 📞 {r.owner.phone}</div>}
                       </div>
                       <span className={statusBadge(r.status)}>{r.status}</span>
                     </div>
@@ -462,58 +498,58 @@ export default function UserDashboard() {
               </div>
             )}
 
-            {/* ── Active borrows (due dates, return, overdue, report) ── */}
+            {/* Active Borrows */}
             {shareTab === 'active' && (
-              <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b">
-                  <h3 className="font-semibold text-gray-900">Active borrows</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Due dates, return confirmations, overdue tracking, and reports.</p>
+              <div className="rounded-3xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/10 bg-white/5">
+                  <h3 className="font-bold text-white">Active borrows</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Track your items and items you've borrowed.</p>
                 </div>
-                {activeBorrows.length === 0 ? <div className="p-8 text-center text-sm text-gray-500">No active borrows.</div> : (
-                  <div className="divide-y">{activeBorrows.map((a) => {
+                {activeBorrows.length === 0 ? <div className="p-10 text-center text-slate-400">No active borrows right now.</div> : (
+                  <div className="divide-y divide-white/10">{activeBorrows.map((a) => {
                     const dl = daysLeft(a.dueDate);
                     const isOverdue = a.status === 'overdue' || (dl !== null && dl < 0 && a.status !== 'returned');
                     return (
-                      <div key={a.id} className="p-4 space-y-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
+                      <div key={a.id} className="p-5 hover:bg-white/5 transition-colors">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0 space-y-2">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium text-gray-900">{a.bookName}</span>
-                              <span className="text-xs text-gray-500">{a.category}</span>
+                              <span className="font-bold text-white text-lg">{a.bookName}</span>
+                              <span className="px-2 py-0.5 rounded bg-white/10 text-xs font-semibold text-slate-300">{a.category}</span>
                               <span className={statusBadge(a.status)}>{a.status}</span>
                             </div>
-                            <div className="mt-1 text-xs text-gray-600">
+                            <div className="text-sm font-medium">
                               {a.isOwner ? (
-                                <span>Borrowed by <span className="font-medium">{a.borrowerName}</span> · {a.borrowerPhone}</span>
+                                <span className="text-slate-300">Lent to: <span className="text-white font-bold">{a.borrowerName}</span> · 📞 {a.borrowerPhone}</span>
                               ) : (
-                                <span>Owner: <span className="font-medium">{a.ownerName}</span> · {a.ownerPhone}</span>
+                                <span className="text-slate-300">Borrowed from: <span className="text-white font-bold">{a.ownerName}</span> · 📞 {a.ownerPhone}</span>
                               )}
                             </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                              <span>Borrowed: {fmtDate(a.borrowedAt)}</span>
-                              <span className={isOverdue ? 'font-bold text-red-600' : 'font-medium text-gray-800'}>
-                                Due: {fmtDate(a.dueDate)}
+                            <div className="flex flex-wrap items-center gap-4 text-xs font-semibold bg-white/5 p-2.5 rounded-xl border border-white/5 w-fit">
+                              <span className="text-slate-400">📅 Borrowed: {fmtDate(a.borrowedAt)}</span>
+                              <span className={isOverdue ? 'text-red-400 border border-red-500/30 bg-red-500/10 px-2 py-0.5 rounded-lg' : 'text-primary-300'}>
+                                ⏰ Due: {fmtDate(a.dueDate)}
                                 {dl !== null && a.status !== 'returned' && (
-                                  <span className="ml-1">({dl > 0 ? `${dl}d left` : dl === 0 ? 'today' : `${Math.abs(dl)}d overdue`})</span>
+                                  <span className="ml-1 opacity-80">({dl > 0 ? `${dl}d left` : dl === 0 ? 'today' : `${Math.abs(dl)}d overdue`})</span>
                                 )}
                               </span>
-                              {a.returnConfirmedAt && <span className="text-emerald-700">Returned: {fmtDate(a.returnConfirmedAt)}</span>}
+                              {a.returnConfirmedAt && <span className="text-emerald-400">✅ Returned: {fmtDate(a.returnConfirmedAt)}</span>}
                             </div>
                             {a.reportReason && (
-                              <div className="mt-1 rounded-lg bg-red-50 border border-red-200 p-2 text-xs text-red-700">
-                                Report: {a.reportReason} ({fmtDate(a.reportedAt)})
+                              <div className="mt-2 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-300 font-medium">
+                                ⚠️ Reported: {a.reportReason} ({fmtDate(a.reportedAt)})
                               </div>
                             )}
                           </div>
                         </div>
                         {(a.status === 'approved' || a.status === 'overdue') && (
-                          <div className="flex gap-2 pt-1">
-                            <button type="button" onClick={() => confirmReturn(a.id)} className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-emerald-700">
-                              Confirm return
+                          <div className="flex gap-2 pt-4 mt-2 border-t border-white/5">
+                            <button type="button" onClick={() => confirmReturn(a.id)} className="rounded-xl bg-emerald-500 hover:bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-colors shadow-lg shadow-emerald-500/20">
+                              ✅ Confirm Returned
                             </button>
                             {!a.reportReason && (
-                              <button type="button" onClick={() => { setReportingBorrow(a.id); setReportReason(''); }} className="rounded-full border border-red-200 px-3 py-1 text-[11px] text-red-600 hover:bg-red-50">
-                                Report issue
+                              <button type="button" onClick={() => { setReportingBorrow(a.id); setReportReason(''); }} className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 transition-colors">
+                                ⚠️ Report Issue
                               </button>
                             )}
                           </div>
@@ -529,99 +565,98 @@ export default function UserDashboard() {
 
         {/* ══════════════════════════════════════ EXCHANGE TAB ══════════════════════════════════════ */}
         {section === 'exchange' && (
-          <div className="space-y-6">
-            <div className="flex gap-1.5 flex-wrap">
-              {[{ id: 'create', label: 'New offer' }, { id: 'offers', label: `My offers (${myOffers.length})` }, { id: 'sent', label: `Sent requests (${myExRequests.length})` }, { id: 'done', label: `Completed (${myExchanges.length})` }].map((t) => (
+          <div className="space-y-8">
+            <div className="flex gap-2 flex-wrap bg-white/5 p-1.5 rounded-2xl w-fit border border-white/10">
+              {[{ id: 'create', label: 'New Offer' }, { id: 'offers', label: `My Offers (${myOffers.length})` }, { id: 'sent', label: `Sent Requests (${myExRequests.length})` }, { id: 'done', label: `Completed (${myExchanges.length})` }].map((t) => (
                 <button key={t.id} onClick={() => setExTab(t.id)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-medium border transition ${exTab === t.id ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  className={`rounded-xl px-5 py-2 text-sm font-bold transition-all ${exTab === t.id ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
                 >{t.label}</button>
               ))}
             </div>
 
             {exTab === 'create' && (
-              <div className="max-w-lg rounded-2xl border bg-white p-6 shadow-sm">
-                <h3 className="font-semibold text-gray-900">Post an exchange offer</h3>
-                <p className="text-xs text-gray-500 mt-1">Share a book you have and what you're looking for.</p>
-                <form onSubmit={createOffer} className="mt-5 grid gap-3">
-                  <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Book you have</span>
-                    <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" value={bookName} onChange={(e) => setBookName(e.target.value)} required /></label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Condition</span>
-                      <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={condition} onChange={(e) => setCondition(e.target.value)}>
+              <div className="max-w-lg rounded-3xl border border-white/10 bg-white/5 p-7 shadow-xl backdrop-blur-sm">
+                <h3 className="font-bold text-white text-xl">Post an exchange offer</h3>
+                <p className="text-sm text-slate-400 mt-1 mb-5">Share a book you have and what you want.</p>
+                <form onSubmit={createOffer} className="grid gap-4">
+                  <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Book you have</span>
+                    <input className={inputClass} value={bookName} onChange={(e) => setBookName(e.target.value)} required /></label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Condition</span>
+                      <select className={selectClass} value={condition} onChange={(e) => setCondition(e.target.value)}>
                         <option value="new">New</option><option value="good">Good</option><option value="used">Used</option>
                       </select></label>
-                    <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Category</span>
-                      <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)} required>
+                    <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Category</span>
+                      <select className={selectClass} value={category} onChange={(e) => setCategory(e.target.value)} required>
                         <option value="">Select category</option>
                         {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select></label>
                   </div>
-                  <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Location</span>
-                    <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" placeholder="e.g. Dhanmondi, Dhaka" value={location} onChange={(e) => setLocation(e.target.value)} required /></label>
-                  <div className="grid grid-cols-5 gap-2 items-end">
-                    <label className="col-span-2 grid gap-1"><span className="text-xs font-medium text-gray-600">Lat</span><input className="rounded-lg border bg-gray-50 px-2 py-1.5 text-xs" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="auto" /></label>
-                    <label className="col-span-2 grid gap-1"><span className="text-xs font-medium text-gray-600">Lng</span><input className="rounded-lg border bg-gray-50 px-2 py-1.5 text-xs" value={lng} onChange={(e) => setLng(e.target.value)} placeholder="auto" /></label>
-                    <button type="button" onClick={useGeo(setLat, setLng)} className="rounded-lg border px-2 py-1.5 text-[10px] hover:bg-gray-50">Detect</button>
+                  <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Location</span>
+                    <input className={inputClass} placeholder="e.g. Dhanmondi, Dhaka" value={location} onChange={(e) => setLocation(e.target.value)} required /></label>
+                  <div className="grid grid-cols-5 gap-3 items-end">
+                    <label className="col-span-2 grid gap-1.5"><span className="text-xs font-semibold text-slate-400">Lat</span><input className={inputClass} style={{ padding: '0.4rem 0.8rem', fontSize: '12px' }} value={lat} onChange={(e) => setLat(e.target.value)} placeholder="auto" /></label>
+                    <label className="col-span-2 grid gap-1.5"><span className="text-xs font-semibold text-slate-400">Lng</span><input className={inputClass} style={{ padding: '0.4rem 0.8rem', fontSize: '12px' }} value={lng} onChange={(e) => setLng(e.target.value)} placeholder="auto" /></label>
+                    <button type="button" onClick={useGeo(setLat, setLng)} className="rounded-xl border border-violet-500/30 bg-violet-500/10 h-[34px] text-[11px] font-bold text-violet-300 hover:bg-violet-500/20 transition-colors">Detect</button>
                   </div>
-                  <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Book you want (optional)</span>
-                    <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" value={wantedBook} onChange={(e) => setWantedBook(e.target.value)} /></label>
-                  <div className="grid gap-1">
-                    <span className="text-sm font-medium text-gray-700">Book images</span>
+                  <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Book you want <span className="opacity-60 font-normal">(optional)</span></span>
+                    <input className={inputClass} value={wantedBook} onChange={(e) => setWantedBook(e.target.value)} /></label>
+                  <div className="grid gap-1.5">
+                    <span className="text-sm font-semibold text-slate-300">Book images</span>
                     <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); pickFiles(setFiles)(e.dataTransfer.files); }}
-                      className="rounded-xl border-2 border-dashed bg-gray-50 p-4 text-center text-xs text-gray-500">
-                      <div>Drop images here or <label className="cursor-pointer font-medium text-gray-900 underline">browse<input type="file" className="hidden" multiple accept="image/*" onChange={(e) => pickFiles(setFiles)(e.target.files)} /></label></div>
-                      <div className="text-[10px] text-gray-400 mt-1">Max 6 images</div>
+                      className="rounded-2xl border-2 border-dashed border-white/20 bg-white/5 p-6 text-center text-sm text-slate-400 hover:bg-white/10 transition-colors">
+                      <div>Drop images here or <label className="cursor-pointer font-bold text-violet-400 hover:text-violet-300">browse<input type="file" className="hidden" multiple accept="image/*" onChange={(e) => pickFiles(setFiles)(e.target.files)} /></label></div>
                     </div>
                     {previews.length > 0 && <div className="mt-2 grid grid-cols-4 gap-2">{previews.map((p) => (
-                      <div key={p.name} className="relative rounded-lg border overflow-hidden"><img src={p.url} alt="" className="h-16 w-full object-cover" />
-                        <button type="button" onClick={() => setFiles((prev) => prev.filter((f) => f.name !== p.name))} className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-[10px] opacity-0 hover:opacity-100 transition">&times;</button></div>
+                      <div key={p.name} className="relative rounded-xl border border-white/20 overflow-hidden"><img src={p.url} alt="" className="h-20 w-full object-cover" />
+                        <button type="button" onClick={() => setFiles((prev) => prev.filter((f) => f.name !== p.name))} className="absolute inset-0 flex items-center justify-center bg-black/60 text-white font-bold opacity-0 hover:opacity-100 transition">&times;</button></div>
                     ))}</div>}
                   </div>
-                  <button disabled={creating} className="rounded-xl bg-gray-900 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60">{creating ? 'Uploading…' : 'Post offer'}</button>
+                  <button disabled={creating} className="mt-2 rounded-2xl bg-gradient-to-r from-violet-500 to-primary-500 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/30 hover:shadow-violet-500/50 disabled:opacity-60 transition-all active:scale-95">{creating ? 'Uploading…' : 'Post Offer'}</button>
                 </form>
               </div>
             )}
 
             {exTab === 'offers' && (
-              <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b"><h3 className="font-semibold text-gray-900">Your offers &amp; incoming requests</h3></div>
-                {myOffers.length === 0 ? <div className="p-8 text-center text-sm text-gray-500">No offers yet.</div> : (
-                  <div className="divide-y">{myOffers.map((o) => (
-                    <div key={o._id} className="p-4 space-y-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${CONDITION_COLORS[o.condition]}`}>{o.condition}</span>
-                          <span className="font-medium text-gray-900">{o.bookName}</span>
-                          <span className="text-xs text-gray-500">{o.category}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${o.status === 'closed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+              <div className="rounded-3xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/10 bg-white/5"><h3 className="font-bold text-white">Your offers &amp; incoming requests</h3></div>
+                {myOffers.length === 0 ? <div className="p-10 text-center text-slate-400">No offers yet.</div> : (
+                  <div className="divide-y divide-white/10">{myOffers.map((o) => (
+                    <div key={o._id} className="p-5 space-y-3 hover:bg-white/5 transition-colors">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className={`shrink-0 border rounded-full px-2.5 py-0.5 text-[10px] font-bold ${CONDITION_COLORS[o.condition]}`}>{o.condition}</span>
+                          <span className="font-bold text-white text-base">{o.bookName}</span>
+                          <span className="px-2 py-0.5 rounded-md bg-white/10 text-xs text-slate-300 font-medium">{o.category}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${o.status === 'closed' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'}`}>
                             {o.status === 'closed' ? 'Completed' : 'Pending'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
                           {o.status === 'open' && (
                             <>
-                              <button type="button" onClick={() => startEditOffer(o)} className="rounded-full border px-2.5 py-1 text-[10px] text-gray-600 hover:bg-gray-50">Edit</button>
-                              <button type="button" onClick={() => deleteOffer(o)} className="rounded-full border border-red-200 px-2.5 py-1 text-[10px] text-red-600 hover:bg-red-50">Delete</button>
+                              <button type="button" onClick={() => startEditOffer(o)} className="rounded-xl border border-white/20 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors">Edit</button>
+                              <button type="button" onClick={() => deleteOffer(o)} className="rounded-xl border border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition-colors">Delete</button>
                             </>
                           )}
-                          <button type="button" onClick={() => selectedOffer?._id === o._id ? setSelectedOffer(null) : loadOfferRequests(o)} className="rounded-full border px-3 py-1 text-xs hover:bg-gray-50">
-                            {selectedOffer?._id === o._id ? 'Hide' : 'View requests'}
+                          <button type="button" onClick={() => selectedOffer?._id === o._id ? setSelectedOffer(null) : loadOfferRequests(o)} className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-1.5 text-xs font-bold text-violet-300 hover:bg-violet-500/20 transition-colors">
+                            {selectedOffer?._id === o._id ? 'Hide Requests' : 'View Requests'}
                           </button>
                         </div>
                       </div>
                       {selectedOffer?._id === o._id && (
-                        <div className="ml-4 rounded-xl border bg-gray-50 overflow-hidden">
-                          {offerRequests.length === 0 ? <div className="p-3 text-xs text-gray-500">No requests yet.</div> : (
-                            <div className="divide-y">{offerRequests.map((r) => (
-                              <div key={r._id} className="p-3 text-xs space-y-1">
-                                <div><span className="font-medium text-gray-900">{r.fromUser?.name || 'User'}</span> offers: <span className="font-medium">{r.offeredBook}</span></div>
-                                {r.message && <div className="text-gray-600">"{r.message}"</div>}
-                                <div className="flex items-center justify-between gap-2 pt-1">
-                                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${r.status === 'accepted' ? 'bg-emerald-100 text-emerald-800' : r.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{r.status}</span>
+                        <div className="ml-5 rounded-2xl border border-white/10 bg-slate-800/80 overflow-hidden shadow-inner mt-3">
+                          {offerRequests.length === 0 ? <div className="p-4 text-sm text-slate-400">No requests yet.</div> : (
+                            <div className="divide-y divide-white/5">{offerRequests.map((r) => (
+                              <div key={r._id} className="p-4 text-sm space-y-2">
+                                <div><span className="font-bold text-white">{r.fromUser?.name || 'A user'}</span> offers in exchange: <span className="font-bold text-violet-300 bg-violet-500/10 px-2 py-0.5 rounded-md">{r.offeredBook}</span></div>
+                                {r.message && <div className="text-slate-300 italic border-l-2 border-violet-500/50 pl-2 py-0.5 mt-1 text-xs">"{r.message}"</div>}
+                                <div className="flex items-center justify-between gap-3 pt-2">
+                                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${r.status === 'accepted' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : r.status === 'rejected' ? 'bg-red-500/20 text-red-300 border-red-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'}`}>{r.status}</span>
                                   {r.status === 'pending' && (
-                                    <div className="flex gap-1.5">
-                                      <button type="button" onClick={() => acceptIncoming(r)} className="rounded-full bg-gray-900 px-2.5 py-0.5 text-[10px] text-white hover:bg-gray-800">Accept</button>
-                                      <button type="button" onClick={() => rejectIncoming(r)} className="rounded-full border px-2.5 py-0.5 text-[10px] hover:bg-gray-50">Reject</button>
+                                    <div className="flex gap-2">
+                                      <button type="button" onClick={() => acceptIncoming(r)} className="rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-1.5 text-xs font-bold text-white hover:opacity-90 transition-opacity">Accept</button>
+                                      <button type="button" onClick={() => { setRejectingExReq(r); setRejectExReason(''); }} className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-1.5 text-xs font-bold text-red-300 hover:bg-red-500/20 transition-colors">Reject</button>
                                     </div>
                                   )}
                                 </div>
@@ -637,17 +672,22 @@ export default function UserDashboard() {
             )}
 
             {exTab === 'sent' && (
-              <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b"><h3 className="font-semibold text-gray-900">Exchange requests you sent</h3></div>
-                {myExRequests.length === 0 ? <div className="p-8 text-center text-sm text-gray-500">No requests sent yet.</div> : (
-                  <div className="divide-y">{myExRequests.map((r) => (
-                    <div key={r._id} className="p-4 flex items-center justify-between gap-3 hover:bg-gray-50/50 transition">
-                      <div>
-                        <div className="text-sm"><span className="text-gray-500">Their book:</span> <span className="font-medium text-gray-900">{r.offer?.bookName}</span></div>
-                        <div className="text-sm"><span className="text-gray-500">You offered:</span> <span className="font-medium text-gray-900">{r.offeredBook}</span></div>
-                        {r.message && <div className="mt-0.5 text-xs text-gray-500">"{r.message}"</div>}
+              <div className="rounded-3xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/10 bg-white/5"><h3 className="font-bold text-white">Exchange requests you sent</h3></div>
+                {myExRequests.length === 0 ? <div className="p-10 text-center text-slate-400">No requests sent yet.</div> : (
+                  <div className="divide-y divide-white/10">{myExRequests.map((r) => (
+                    <div key={r._id} className="p-5 flex items-center justify-between gap-4 hover:bg-white/5 transition-colors">
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-slate-300">You requested: <span className="font-bold text-white">{r.offer?.bookName}</span></div>
+                        <div className="text-sm font-medium text-slate-300">You offered: <span className="font-bold text-violet-300">{r.offeredBook}</span></div>
+                        {r.message && <div className="mt-1 text-xs text-slate-400 italic">"{r.message}"</div>}
+                        {r.status === 'rejected' && r.rejectMessage && (
+                          <div className="mt-2 text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                            <span className="font-semibold">Reason:</span> {r.rejectMessage}
+                          </div>
+                        )}
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${r.status === 'accepted' ? 'bg-emerald-100 text-emerald-800' : r.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{r.status}</span>
+                      <span className={`shrink-0 border rounded-full px-3 py-1 text-[10px] font-bold ${r.status === 'accepted' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : r.status === 'rejected' ? 'bg-red-500/20 text-red-300 border-red-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'}`}>{r.status}</span>
                     </div>
                   ))}</div>
                 )}
@@ -655,14 +695,27 @@ export default function UserDashboard() {
             )}
 
             {exTab === 'done' && (
-              <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b"><h3 className="font-semibold text-gray-900">Successful exchanges</h3><p className="text-xs text-gray-500 mt-0.5">Initial books and final agreed books.</p></div>
-                {myExchanges.length === 0 ? <div className="p-8 text-center text-sm text-gray-500">No completed exchanges yet.</div> : (
-                  <div className="divide-y">{myExchanges.map((e) => (
-                    <div key={e.id} className="p-4 space-y-1">
-                      <div className="text-sm font-medium text-gray-900">{e.ownerName} ↔ {e.requesterName}</div>
-                      <div className="text-xs text-gray-600">Initial: {e.offerBook} ↔ {e.requesterBook}</div>
-                      <div className="text-xs text-gray-600">Final: <span className="font-medium text-gray-800">{e.finalOwnerBook}</span> ↔ <span className="font-medium text-gray-800">{e.finalFromUserBook}</span></div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/10 bg-white/5">
+                  <h3 className="font-bold text-white">Completed exchanges</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Records of successful book trades.</p>
+                </div>
+                {myExchanges.length === 0 ? <div className="p-10 text-center text-slate-400">No completed exchanges yet.</div> : (
+                  <div className="divide-y divide-white/10">{myExchanges.map((e) => (
+                    <div key={e.id} className="p-5 space-y-2 hover:bg-white/5 transition-colors">
+                      <div className="text-sm font-bold text-white bg-white/5 px-3 py-1.5 rounded-lg border border-white/5 w-fit flex items-center gap-1.5 flex-wrap">
+                        👤 {e.ownerName} <span className="opacity-60 text-xs font-normal">📞 {e.ownerPhone || 'N/A'}</span>
+                        <span className="mx-1 text-violet-400">↔</span>
+                        👤 {e.requesterName} <span className="opacity-60 text-xs font-normal">📞 {e.requesterPhone || 'N/A'}</span>
+                      </div>
+                      {e.offerBook === e.finalOwnerBook && e.requesterBook === e.finalFromUserBook ? (
+                        <div className="text-sm text-slate-300 px-1">Exchanged: <span className="font-bold text-violet-300">{e.offerBook}</span> <span className="mx-1 text-slate-500">↔</span> <span className="font-bold text-primary-300">{e.requesterBook}</span></div>
+                      ) : (
+                        <>
+                          <div className="text-xs text-slate-400 px-1">Original Offer: <span className="text-slate-300">{e.offerBook}</span> <span className="mx-1">↔</span> <span className="text-slate-300">{e.requesterBook}</span></div>
+                          <div className="text-sm text-slate-300 px-1">Final Agreed: <span className="font-bold text-violet-300">{e.finalOwnerBook}</span> <span className="mx-1 text-slate-500">↔</span> <span className="font-bold text-primary-300">{e.finalFromUserBook}</span></div>
+                        </>
+                      )}
                     </div>
                   ))}</div>
                 )}
@@ -672,93 +725,109 @@ export default function UserDashboard() {
         )}
       </div>
 
-      {/* ══════════════ Edit Share Modal ══════════════ */}
+      {/* ══════════════ Modals ══════════════ */}
+      {/* Edit Share Modal */}
       {editingShare && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div><h3 className="font-semibold text-gray-900">Edit listing</h3><p className="text-sm text-gray-600 mt-0.5">Update your share book listing.</p></div>
-              <button onClick={() => setEditingShare(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
-            </div>
-            <form onSubmit={saveEditShare} className="grid gap-3">
-              <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Book title</span>
-                <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" value={esBookName} onChange={(e) => setEsBookName(e.target.value)} required /></label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Condition</span>
-                  <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={esCondition} onChange={(e) => setEsCondition(e.target.value)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-slate-800 border border-white/10 shadow-2xl p-7">
+            <h3 className="font-bold text-white text-lg">Edit Listing</h3>
+            <p className="text-sm text-slate-400 mt-1 mb-5">Update your shared book details.</p>
+            <form onSubmit={saveEditShare} className="grid gap-4">
+              <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Book title</span>
+                <input className={inputClass} value={esBookName} onChange={(e) => setEsBookName(e.target.value)} required /></label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Condition</span>
+                  <select className={selectClass} value={esCondition} onChange={(e) => setEsCondition(e.target.value)}>
                     <option value="new">New</option><option value="good">Good</option><option value="used">Used</option>
                   </select></label>
-                <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Category</span>
-                  <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={esCategory} onChange={(e) => setEsCategory(e.target.value)} required>
+                <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Category</span>
+                  <select className={selectClass} value={esCategory} onChange={(e) => setEsCategory(e.target.value)} required>
                     <option value="">Select category</option>
                     {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select></label>
               </div>
-              <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Location</span>
-                <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" value={esLocation} onChange={(e) => setEsLocation(e.target.value)} required /></label>
-              <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Borrow duration</span>
-                <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={esDuration} onChange={(e) => setEsDuration(Number(e.target.value))}>
+              <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Location</span>
+                <input className={inputClass} value={esLocation} onChange={(e) => setEsLocation(e.target.value)} required /></label>
+              <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Borrow duration</span>
+                <select className={selectClass} value={esDuration} onChange={(e) => setEsDuration(Number(e.target.value))}>
                   {DURATION_OPTIONS.map((d) => <option key={d} value={d}>{d} days</option>)}
                 </select></label>
-              <div className="flex gap-2 pt-1">
-                <button disabled={esSaving} className="flex-1 rounded-xl bg-gray-900 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60">{esSaving ? 'Saving…' : 'Save changes'}</button>
-                <button type="button" onClick={() => setEditingShare(null)} className="rounded-xl border px-4 py-2.5 text-sm hover:bg-gray-50">Cancel</button>
+              <div className="flex gap-3 pt-2">
+                <button disabled={esSaving} className="flex-1 rounded-2xl bg-primary-500 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/30 hover:bg-primary-600 transition-colors disabled:opacity-60">{esSaving ? 'Saving…' : 'Save Changes'}</button>
+                <button type="button" onClick={() => setEditingShare(null)} className="rounded-2xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors">Cancel</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ══════════════ Edit Exchange Offer Modal ══════════════ */}
+      {/* Edit Offer Modal */}
       {editingOffer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div><h3 className="font-semibold text-gray-900">Edit offer</h3><p className="text-sm text-gray-600 mt-0.5">Update your exchange offer details.</p></div>
-              <button onClick={() => setEditingOffer(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
-            </div>
-            <form onSubmit={saveEditOffer} className="grid gap-3">
-              <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Book you have</span>
-                <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" value={editBookName} onChange={(e) => setEditBookName(e.target.value)} required /></label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Condition</span>
-                  <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={editCondition} onChange={(e) => setEditCondition(e.target.value)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-slate-800 border border-white/10 shadow-2xl p-7">
+            <h3 className="font-bold text-white text-lg">Edit Offer</h3>
+            <p className="text-sm text-slate-400 mt-1 mb-5">Update your exchange offer details.</p>
+            <form onSubmit={saveEditOffer} className="grid gap-4">
+              <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Book you have</span>
+                <input className={inputClass} value={editBookName} onChange={(e) => setEditBookName(e.target.value)} required /></label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Condition</span>
+                  <select className={selectClass} value={editCondition} onChange={(e) => setEditCondition(e.target.value)}>
                     <option value="new">New</option><option value="good">Good</option><option value="used">Used</option>
                   </select></label>
-                <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Category</span>
-                  <select className="rounded-xl border bg-gray-50 px-3 py-2 text-sm" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} required>
+                <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Category</span>
+                  <select className={selectClass} value={editCategory} onChange={(e) => setEditCategory(e.target.value)} required>
                     <option value="">Select category</option>
                     {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select></label>
               </div>
-              <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Location</span>
-                <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} required /></label>
-              <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Book you want (optional)</span>
-                <input className="rounded-xl border bg-gray-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200" value={editWantedBook} onChange={(e) => setEditWantedBook(e.target.value)} /></label>
-              <div className="flex gap-2 pt-1">
-                <button disabled={editSaving} className="flex-1 rounded-xl bg-gray-900 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60">{editSaving ? 'Saving…' : 'Save changes'}</button>
-                <button type="button" onClick={() => setEditingOffer(null)} className="rounded-xl border px-4 py-2.5 text-sm hover:bg-gray-50">Cancel</button>
+              <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Location</span>
+                <input className={inputClass} value={editLocation} onChange={(e) => setEditLocation(e.target.value)} required /></label>
+              <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-300">Book you want (optional)</span>
+                <input className={inputClass} value={editWantedBook} onChange={(e) => setEditWantedBook(e.target.value)} /></label>
+              <div className="flex gap-3 pt-2">
+                <button disabled={editSaving} className="flex-1 rounded-2xl bg-violet-500 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/30 hover:bg-violet-600 transition-colors disabled:opacity-60">{editSaving ? 'Saving…' : 'Save Changes'}</button>
+                <button type="button" onClick={() => setEditingOffer(null)} className="rounded-2xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors">Cancel</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ══════════════ Report Modal ══════════════ */}
+      {/* Reject Exchange Modal */}
+      {rejectingExReq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-slate-800 border border-white/10 shadow-2xl p-7">
+            <h3 className="font-bold text-white text-lg">Reject Exchange Request</h3>
+            <p className="text-sm text-slate-400 mt-1 mb-5">Are you sure? You can provide an optional reason.</p>
+            <form onSubmit={submitRejectEx} className="grid gap-4">
+              <label className="grid gap-1.5">
+                <textarea className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-500 min-h-32 focus:outline-none focus:ring-2 focus:ring-red-500/50 resize-none transition-all"
+                  value={rejectExReason} onChange={(e) => setRejectExReason(e.target.value)} placeholder="Optional reason for rejection..." />
+              </label>
+              <div className="flex gap-3 pt-2">
+                <button className="flex-1 rounded-2xl bg-red-500 py-3 text-sm font-bold text-white shadow-lg shadow-red-500/30 hover:bg-red-600 transition-colors">Confirm Reject</button>
+                <button type="button" onClick={() => { setRejectingExReq(null); setRejectExReason(''); }} className="rounded-2xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal */}
       {reportingBorrow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div><h3 className="font-semibold text-gray-900">Report an issue</h3><p className="text-sm text-gray-600 mt-0.5">Describe the problem with this borrow.</p></div>
-              <button onClick={() => setReportingBorrow(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
-            </div>
-            <form onSubmit={submitReport} className="grid gap-3">
-              <label className="grid gap-1"><span className="text-sm font-medium text-gray-700">Reason</span>
-                <textarea className="rounded-xl border bg-gray-50 px-3 py-2.5 text-sm min-h-24 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
-                  value={reportReason} onChange={(e) => setReportReason(e.target.value)} required placeholder="e.g. Book damaged, not returned on time…" /></label>
-              <div className="flex gap-2 pt-1">
-                <button className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700">Submit report</button>
-                <button type="button" onClick={() => setReportingBorrow(null)} className="rounded-xl border px-4 py-2.5 text-sm hover:bg-gray-50">Cancel</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-slate-800 border border-white/10 shadow-2xl p-7">
+            <h3 className="font-bold text-white text-lg flex items-center gap-2">⚠️ Report an issue</h3>
+            <p className="text-sm text-slate-400 mt-1 mb-5">Describe the problem with this borrow (e.g. damaged, late).</p>
+            <form onSubmit={submitReport} className="grid gap-4">
+              <label className="grid gap-1.5">
+                <textarea className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-500 min-h-32 focus:outline-none focus:ring-2 focus:ring-red-500/50 resize-none transition-all"
+                  value={reportReason} onChange={(e) => setReportReason(e.target.value)} required placeholder="Describe the issue in detail..." />
+              </label>
+              <div className="flex gap-3 pt-2">
+                <button className="flex-1 rounded-2xl bg-red-500 py-3 text-sm font-bold text-white shadow-lg shadow-red-500/30 hover:bg-red-600 transition-colors">Submit Report</button>
+                <button type="button" onClick={() => setReportingBorrow(null)} className="rounded-2xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors">Cancel</button>
               </div>
             </form>
           </div>
