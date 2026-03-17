@@ -2,7 +2,7 @@ export async function uploadBase64ToImgbb({ base64, name }) {
   const apiKey = process.env.IMGBB_API_KEY;
   if (!apiKey) throw new Error('IMGBB_API_KEY is not set');
 
-  // Accept either raw base64 or data URL. ImgBB wants raw base64.
+  
   const raw = String(base64 || '');
   const cleaned = raw.includes('base64,') ? raw.split('base64,').pop() : raw;
   if (!cleaned) throw new Error('Missing image base64');
