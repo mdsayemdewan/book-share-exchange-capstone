@@ -274,7 +274,7 @@ export default function Exchange() {
             <div className="mt-2 text-sm text-violet-300/80">
               Try adjusting your filters, or{' '}
               {auth?.token ? (
-                <button onClick={() => navigate('/dashboard')} className="underline font-semibold text-violet-400 hover:text-violet-300">
+                <button onClick={() => navigate('/dashboard', { state: { section: 'exchange', exTab: 'create' } })} className="underline font-semibold text-violet-400 hover:text-violet-300">
                   post your own exchange offer
                 </button>
               ) : (
