@@ -2,7 +2,8 @@ import { getToken, clearAuth } from './auth';
 
 export async function api(path, { method = 'GET', body, headers } = {}) {
   const token = getToken();
-  const res = await fetch(path, {
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+  const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
