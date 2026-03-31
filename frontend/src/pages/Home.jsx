@@ -18,7 +18,10 @@ export default function Home() {
     setLoading(true);
     try {
       const result = await api('/api/home/recent');
-      setData(result);
+      setData({
+        shares: result?.shares || [],
+        exchanges: result?.exchanges || []
+      });
     } catch (err) {
       setError(err?.message || 'Failed to load recent posts');
     } finally {
