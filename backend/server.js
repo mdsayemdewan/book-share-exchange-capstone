@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import express from 'express';
-import 'express-async-errors';
 import cors from 'cors';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
@@ -41,12 +40,6 @@ app.use('/api/share', shareRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/users', userRoutes);
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ message: err.message || 'Internal Server Error' });
-});
 
 // Start server
 app.listen(PORT, () => {
