@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, isNetworkError } from '../lib/api';
 
 const CONDITION_COLORS = { new: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30', good: 'bg-sky-500/20 text-sky-300 border-sky-400/30', used: 'bg-amber-500/20 text-amber-300 border-amber-400/30' };
 const CATEGORIES = ['Fiction', 'Non-fiction', 'Academic', 'Science', 'History', 'Self-help', 'Children', 'Thriller', 'Horror', 'Comics', 'Fantasy', 'Other'];
@@ -140,6 +140,11 @@ export default function UserDashboard() {
       setMyExRequests(exReqs.requests || []);
       setMyExchanges(exchanges.exchanges || []);
     } catch (err) {
+      if (isNetworkError(err)) {
+        // CORS preflight / network blip: keep spinner, auto-retry in 3s
+        setTimeout(load, 3000);
+        return;
+      }
       setError(err?.message || 'Failed to load');
     } finally {
       setLoading(false);

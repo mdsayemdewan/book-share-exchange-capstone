@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, isNetworkError } from '../lib/api';
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
@@ -13,6 +13,7 @@ export default function AdminDashboard() {
       const data = await api('/api/admin/users?status=pending');
       setUsers(data.users || []);
     } catch (err) {
+      if (isNetworkError(err)) { setTimeout(load, 3000); return; }
       setError(err?.message || 'Failed to load');
     } finally {
       setLoading(false);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, isNetworkError } from '../lib/api';
 import { getAuth } from '../lib/auth';
 
 const CONDITION_OPTIONS = ['all', 'new', 'good', 'used'];
@@ -44,6 +44,7 @@ export default function Exchange() {
       const data = await api('/api/exchange/offers');
       setOffers(data.offers || []);
     } catch (err) {
+      if (isNetworkError(err)) return; // keep loader visible on network blip
       setError(err?.message || 'Failed to load offers');
     } finally {
       setLoading(false);

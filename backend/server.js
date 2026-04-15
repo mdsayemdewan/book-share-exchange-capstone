@@ -16,13 +16,21 @@ import userRoutes from './routes/userRoutes.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors({
+const corsOptions = {
   origin: [
+    'https://book-share-exchange-capstone-backend.vercel.app',
     'https://book-share-exchange-capstone.vercel.app',
-    'http://localhost:5173'
+    'http://localhost:5173',
+    'http://localhost:5174',
   ],
-  credentials: true
-}));
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+// Handle ALL preflight (OPTIONS) requests first — required for Vercel serverless
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 connectDB();
 

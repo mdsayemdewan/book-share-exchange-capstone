@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, isNetworkError } from '../lib/api';
 
 // ── Confirm delete modal ──────────────────────────────────────────────────────
 function ConfirmModal({ item, onConfirm, onCancel }) {
@@ -59,6 +59,7 @@ export default function AdminShares() {
       const data = await api('/api/admin/shares');
       setBooks(data.books || []);
     } catch (err) {
+      if (isNetworkError(err)) { setTimeout(load, 3000); return; }
       setError(err?.message || 'Failed to load share posts');
     } finally {
       setLoading(false);
