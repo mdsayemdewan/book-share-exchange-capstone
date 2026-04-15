@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, isNetworkError } from '../lib/api';
 import { getAuth } from '../lib/auth';
 
 const CONDITION_COLORS = { new: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30', good: 'bg-sky-500/20 text-sky-300 border border-sky-500/30', used: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' };
@@ -23,6 +23,10 @@ export default function Home() {
         exchanges: result?.exchanges || []
       });
     } catch (err) {
+      if (isNetworkError(err)) {
+        // Keep the skeleton loader visible — don't flash an error on network blip
+        return;
+      }
       setError(err?.message || 'Failed to load recent posts');
     } finally {
       setLoading(false);
