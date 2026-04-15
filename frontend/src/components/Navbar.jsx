@@ -1,7 +1,73 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearAuth, getAuth } from '../lib/auth';
 import { api } from '../lib/api';
+
+const ADMIN_LINKS = [
+  { label: 'User Approvals', path: '/admin' },
+  { label: 'Share Posts', path: '/admin/shares' },
+  { label: 'Exchange Posts', path: '/admin/exchanges' },
+  { label: 'User Profiles', path: '/admin/user-profiles' },
+];
+
+// ── Admin dropdown (desktop only) ────────────────────────────────────────────
+function AdminDropdown({ nav }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const location = useLocation();
+  const isAdminPage = location.pathname.startsWith('/admin');
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative hidden md:block">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+          isAdminPage
+            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+            : 'text-slate-300 hover:text-white hover:bg-white/10'
+        }`}
+      >
+        🛡️ Admin
+        <svg
+          className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-52 rounded-2xl border border-white/10 bg-slate-800/95 backdrop-blur-2xl shadow-2xl p-1.5 flex flex-col gap-0.5">
+          {ADMIN_LINKS.map((link) => {
+            const active = location.pathname === link.path;
+            return (
+              <button
+                key={link.path}
+                onClick={() => { nav(link.path); setOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${
+                  active
+                    ? 'bg-indigo-500/20 text-indigo-200'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <span>{link.emoji}</span>
+                {link.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 export default function Navbar() {
   const nav = useNavigate();
@@ -34,6 +100,7 @@ export default function Navbar() {
     loadNotifications();
     const id = setInterval(loadNotifications, 15000);
     return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onNotificationClick = (n) => {
@@ -82,12 +149,7 @@ export default function Navbar() {
           {auth?.token ? (
             <>
               {auth?.user?.role === 'admin' ? (
-                <button
-                  onClick={() => nav('/admin')}
-                  className="hidden md:flex items-center gap-1.5 text-slate-300 hover:text-white hover:bg-white/10 px-4 py-2 rounded-xl transition-all"
-                >
-                  Admin Panel
-                </button>
+                <AdminDropdown nav={nav} />
               ) : (
                 <>
                   <button
@@ -224,7 +286,9 @@ export default function Navbar() {
   );
 }
 
-/* Mobile hamburger menu component */
+/* ─────────────────────────────────────────────────────
+   Mobile hamburger menu component
+───────────────────────────────────────────────────── */
 function MobileMenu({ auth, nav, logout, points }) {
   const [open, setOpen] = useState(false);
 
@@ -287,7 +351,12 @@ function MobileMenu({ auth, nav, logout, points }) {
           {auth?.token ? (
             <>
               {auth?.user?.role === 'admin' ? (
-                <MobileNavItem label="Admin Panel" onClick={() => go('/admin')} />
+                <>
+                  <MobileNavItem label="Approvals" onClick={() => go('/admin')} />
+                  <MobileNavItem label="Share Posts" onClick={() => go('/admin/shares')} />
+                  <MobileNavItem label="Exchanges" onClick={() => go('/admin/exchanges')} />
+                  <MobileNavItem label="User Profiles" onClick={() => go('/admin/user-profiles')} />
+                </>
               ) : (
                 <>
                   <MobileNavItem label="Dashboard" onClick={() => go('/dashboard')} />
