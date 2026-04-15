@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, isNetworkError } from '../lib/api';
 
 // ── Confirm delete modal ──────────────────────────────────────────────────────
 function ConfirmModal({ item, onConfirm, onCancel }) {
@@ -58,6 +57,10 @@ export default function AdminExchanges() {
       const data = await api('/api/admin/exchanges');
       setOffers(data.offers || []);
     } catch (err) {
+      if (isNetworkError(err)) {
+        setTimeout(load, 3000);
+        return;
+      }
       setError(err?.message || 'Failed to load exchange posts');
     } finally {
       setLoading(false);

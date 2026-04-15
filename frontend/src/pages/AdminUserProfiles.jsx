@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, isNetworkError } from '../lib/api';
 
 // ── Profile detail drawer ─────────────────────────────────────────────────────
 function ProfileDrawer({ user, onClose }) {
@@ -101,6 +101,10 @@ export default function AdminUserProfiles() {
       const data = await api('/api/admin/users');
       setUsers(data.users || []);
     } catch (err) {
+      if (isNetworkError(err)) {
+        setTimeout(load, 3000);
+        return;
+      }
       setError(err?.message || 'Failed to load users');
     } finally {
       setLoading(false);
