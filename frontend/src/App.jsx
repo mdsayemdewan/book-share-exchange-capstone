@@ -5,6 +5,9 @@ import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import Pending from './pages/Pending.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import AdminShares from './pages/AdminShares.jsx';
+import AdminExchanges from './pages/AdminExchanges.jsx';
+import AdminUserProfiles from './pages/AdminUserProfiles.jsx';
 import UserDashboard from './pages/UserDashboard.jsx';
 import Home from './pages/Home.jsx';
 import Exchange from './pages/Exchange.jsx';
@@ -55,6 +58,30 @@ export default function App() {
             element={
               <ProtectedRoute role="admin">
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/shares"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminShares />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/exchanges"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminExchanges />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/user-profiles"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminUserProfiles />
               </ProtectedRoute>
             }
           />
