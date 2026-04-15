@@ -37,7 +37,6 @@ export default function Home() {
     <div className="min-h-screen bg-slate-900 text-slate-200 selection:bg-primary-500/30">
       {/* ── Hero Section ── */}
       <section className="relative overflow-hidden border-b border-white/5 bg-slate-800/20">
-        {/* Decorative large blobs behind hero */}
         <div className="absolute top-0 right-0 -translate-y-12 translate-x-1/3 pointer-events-none">
           <div className="h-[600px] w-[600px] rounded-full bg-primary-500/10 mix-blend-screen blur-[100px]"></div>
         </div>
